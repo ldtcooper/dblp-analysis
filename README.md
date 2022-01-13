@@ -1,2 +1,2 @@
-# databases
+# Databases
 Assignments for a Graduate Databases course
