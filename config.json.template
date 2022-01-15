@@ -1,6 +1,6 @@
 {
     "host": "",
-    "database": "movielens",
+    "database": "",
     "user": "",
     "password": ""
 }
