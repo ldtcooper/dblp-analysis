@@ -33,7 +33,7 @@ def connect():
         print('Connecting to Postgres')
         conn = psycopg2.connect(**conf)
 
-        return conn.cursor()
+        return conn
     except (Exception, psycopg2.DatabaseError) as error:
         print(error)
         
@@ -77,14 +77,20 @@ def build_row_names(row: RowRepresentation) -> str:
 
 def build_row_values(row: RowRepresentation) -> str:
     """Joins all row values (second el of cell tuples) into valid SQL"""
-    row_vals = [f"'{clean_single_quotes(el[1])}'" for el in row]
+    row_vals = []
+    for name, val in row:
+        if name == 'year':
+            # year is an integer and doesn't need quotes
+            row_vals.append(f"{val}")
+        else:
+            row_vals.append(f"'{clean_single_quotes(val)}'")
+            
     return ', '.join(row_vals)
     
 def build_item_insert(row: RowRepresentation, table_name: str) -> str:
     """Turns a row representation into a SQL query for a given table name"""
     # table names are capitalized
-    table_name = table_name.capitalize()
-    return f"INSERT INTO public.{table_name} ({build_row_names(row)}) VALUES({build_row_values(row)});"
+    return f"INSERT INTO public.{table_name} ({build_row_names(row)}) VALUES ({build_row_values(row)});"
     
 def build_author_values(authors: AuthorshipListing, pubkey: str) -> str:
     """"Turns list of authors into values section for multiple insert"""
@@ -93,23 +99,31 @@ def build_author_values(authors: AuthorshipListing, pubkey: str) -> str:
 
 def build_authors_insert(authors: AuthorshipListing, pubkey: str) -> str:
     """Turns a list of authors into a SQL query to insert them into authorship table"""
-    # INSERT INTO products(product_no, name, price) VALUES(1, 'Cheese', 9.99),(2, 'Bread', 1.99),(3, 'Milk', 2.99)
-    return f"INSERT INTO public.Authorship (pubkey, author) VALUES{build_author_values(authors, pubkey)}"
+    return f"INSERT INTO public.authorship (pubkey, author) VALUES {build_author_values(authors, pubkey)}"
 
     
 def pipeline(file_path: str):
     """Iterates through XML document, adding the elements we need to the DB"""
-    cursor = connect()
+    conn = connect()
+    cursor = conn.cursor()
     ip = iterparse(file_path, events=("start",))
     _, root = next(ip)
-    for elem in root:
-        if elem.tag == 'inproceedings' or elem.tag == 'article':
-            item_representation, authors, pubkey = handle_tag_type(elem)
-            item_insert = build_item_insert(item_representation, elem.tag)
-            authors_insert = build_authors_insert(authors, pubkey)
-            cursor.execute(item_insert)
-            cursor.execute(authors_insert)
-            elem.clear()
+    try:
+        for elem in root:
+            if elem.tag == 'inproceedings' or elem.tag == 'article':
+                item_representation, authors, pubkey = handle_tag_type(elem)
+                item_insert = build_item_insert(item_representation, elem.tag)
+                cursor.execute(item_insert)
+                
+                if len(authors) > 0:
+                    authors_insert = build_authors_insert(authors, pubkey)
+                    cursor.execute(authors_insert)
+                    
+                conn.commit()
+                elem.clear()
+    finally: 
+        cursor.close()
+        conn.close()
                         
 if __name__ == '__main__':
-    pipeline('./sample.xml')
+    pipeline('./materials/sample.xml')
