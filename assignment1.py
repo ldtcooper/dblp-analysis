@@ -32,7 +32,7 @@ def connect():
         conf = read_config()
         print('Connecting to Postgres')
         conn = psycopg2.connect(**conf)
-
+        print('Connection established')
         return conn
     except (Exception, psycopg2.DatabaseError) as error:
         print(error)
@@ -112,18 +112,22 @@ def pipeline(file_path: str):
         for elem in root:
             if elem.tag == 'inproceedings' or elem.tag == 'article':
                 item_representation, authors, pubkey = handle_tag_type(elem)
+                print(f'Converting {pubkey}...')
                 item_insert = build_item_insert(item_representation, elem.tag)
                 cursor.execute(item_insert)
                 
                 if len(authors) > 0:
                     authors_insert = build_authors_insert(authors, pubkey)
                     cursor.execute(authors_insert)
-                    
+                
                 conn.commit()
+                print(f'{pubkey} comitted!')
                 elem.clear()
+    except Exception as err:
+        print(err)
     finally: 
         cursor.close()
         conn.close()
                         
 if __name__ == '__main__':
-    pipeline('./materials/sample.xml')
+    pipeline('./materials/dblp-2022-01-01.xml')
