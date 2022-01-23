@@ -2,7 +2,7 @@ import psycopg2
 import json
 import sys
 from typing import Dict, Tuple, List
-from xml.etree.ElementTree import iterparse, Element
+from lxml import etree
 
 CellRepresentation = Tuple[str, str]  # structure: ('column_name', 'cell_value')
 RowRepresentation = List[CellRepresentation] # structure: [('column_name', 'cell_value'), ...]
@@ -37,15 +37,15 @@ def connect():
     except (Exception, psycopg2.DatabaseError) as error:
         print(error)
         
-def get_pubkey(elem: Element) -> str:
+def get_pubkey(elem) -> str:
     """Returns the primary key element from a tag"""
     return elem.get('key')
 
-def get_text(elem: Element) -> str:
+def get_text(elem) -> str:
     """Returns the inner text of a tag"""
     return "".join(elem.itertext())
 
-def build_column_tuple(elem: Element) -> CellRepresentation:
+def build_column_tuple(elem) -> CellRepresentation:
     """Returns a tuple of the element's tag name and text"""
     return (elem.tag, get_text(elem))
     
@@ -54,7 +54,7 @@ def clean_single_quotes(text: str) -> str:
     """Excapes all single quotes (') in text into a double single quote('')"""
     return text.replace("'", "''")
 
-def handle_tag_type(elem: Element) -> Tuple[RowRepresentation, AuthorshipListing, str]:
+def handle_tag_type(elem) -> Tuple[RowRepresentation, AuthorshipListing, str]:
     """Returns the data we want for either inproceeding or article rows"""
     lookout_tags = relevant_tags.get(elem.tag)
     if lookout_tags is None:
@@ -89,12 +89,16 @@ def build_row_values(row: RowRepresentation) -> str:
     
 def build_item_insert(row: RowRepresentation, table_name: str) -> str:
     """Turns a row representation into a SQL query for a given table name"""
-    # table names are capitalized
+    # table names are not capitalized
     return f"INSERT INTO public.{table_name} ({build_row_names(row)}) VALUES ({build_row_values(row)});"
     
+def dedup_authorships(authors: AuthorshipListing) -> AuthorshipListing:
+    """Removes duplicates from author lists"""
+    return list(set(authors))
+
 def build_author_values(authors: AuthorshipListing, pubkey: str) -> str:
     """"Turns list of authors into values section for multiple insert"""
-    keyed_authors = [f"('{pubkey}', '{clean_single_quotes(a)}')" for a in authors]
+    keyed_authors = [f"('{pubkey}', '{clean_single_quotes(a)}')" for a in dedup_authorships(authors)]
     return ', '.join(keyed_authors)
 
 def build_authors_insert(authors: AuthorshipListing, pubkey: str) -> str:
@@ -106,11 +110,11 @@ def pipeline(file_path: str):
     """Iterates through XML document, adding the elements we need to the DB"""
     conn = connect()
     cursor = conn.cursor()
-    ip = iterparse(file_path, events=("start",))
-    _, root = next(ip)
+    context = etree.iterparse(file_path, events=("start", "end"), dtd_validation=True)
     try:
-        for elem in root:
-            if elem.tag == 'inproceedings' or elem.tag == 'article':
+        # guided by https://stackoverflow.com/questions/9856163/using-lxml-and-iterparse-to-parse-a-big-1gb-xml-file
+        for event, elem in context:
+            if event == "end" and (elem.tag == 'inproceedings' or elem.tag == 'article'):
                 item_representation, authors, pubkey = handle_tag_type(elem)
                 print(f'Converting {pubkey}...')
                 item_insert = build_item_insert(item_representation, elem.tag)
@@ -124,10 +128,12 @@ def pipeline(file_path: str):
                 print(f'{pubkey} comitted!')
                 elem.clear()
     except Exception as err:
-        print(err)
+        print(f'Error: {err}')
     finally: 
+        print('Closing connection...')
         cursor.close()
         conn.close()
+        print('Connection closed')
                         
 if __name__ == '__main__':
-    pipeline('./materials/dblp-2022-01-01.xml')
+    pipeline('../materials/dblp.xml')

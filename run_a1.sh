@@ -1,1 +1,0 @@
-python assignment1.py $(hostname).local
