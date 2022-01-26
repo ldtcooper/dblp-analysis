@@ -1,0 +1,176 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+
+<homework>
+<item>
+	<id>q1a</id>
+	<question> Count the number of tuples in Inproceedings </question>
+	<sql><![CDATA[
+        SELECT COUNT(*) AS q1a FROM inproceedings;
+	]]></sql>
+    <result>
+        2956396
+    </result>
+</item>
+<item>
+	<id>q1b</id>
+	<question> Count the number of tuples in Article </question>
+	<sql><![CDATA[
+        SELECT COUNT(*) AS q1b FROM article;
+	]]></sql>
+    <result>
+        2738932
+    </result>
+</item>
+<item>
+	<id>q1c</id>
+	<question> Count the number of tuples in Authorship </question>
+	<sql><![CDATA[
+        SELECT COUNT(*) AS q1c FROM authorship;
+	]]></sql>
+    <result>
+        18128940
+    </result>
+</item>
+<item>
+	<id>q2a</id>
+	<question> Add a column "Area" in the Inproceedings table. </question>
+	<sql><![CDATA[
+        ALTER TABLE inproceedings ADD COLUMN area text;
+	]]></sql>
+    <result>
+        Done.
+        []
+    </result>
+</item>
+<item>
+    <id> q2b </id>
+    <question> Populate the column 'Area' with the values from the table if there is a match, otherwise set it to 'UNKNOWN' </question>
+    <sql><![CDATA[
+        UPDATE inproceedings SET area = 'Database' WHERE booktitle IN ('SIGMOD Conference', 'VLDB', 'ICDE', 'PODS');
+        UPDATE inproceedings SET area = 'Theory' WHERE booktitle IN ('STOC', 'FOCS', 'SODA', 'ICALP');
+        UPDATE inproceedings SET area = 'Systems' WHERE booktitle IN ('SIGCOMM', 'ISCA', 'HPCA', 'PLDI');
+        UPDATE inproceedings SET area = 'ML-AI' WHERE booktitle IN ('ICML', 'NIPS', 'NeurIPS', 'AAAI', 'IJCAI');
+        UPDATE inproceedings SET area = 'UNKNOWN' WHERE area IS NULL;
+	]]></sql>
+    <result>
+        13126 rows affected.
+        13758 rows affected.
+        6289 rows affected.
+        43475 rows affected.
+        2879748 rows affected.
+        []
+    </result>
+</item>
+<item>
+    <id>q3a</id>
+    <question>Find the number of authors who published in each area (do not consider UNKNOWN). </question>
+    <sql><![CDATA[
+        SELECT area, COUNT(author) AS cnt FROM inproceedings, authorship 
+        WHERE 
+            inproceedings.pubkey = authorship.pubkey 
+            AND area != 'UNKNOWN'
+        GROUP BY area;
+    ]]></sql>
+    <result>
+        Database 43836
+        ML-AI	143124
+        Systems	23744
+        Theory	33626
+    </result>
+</item>
+<item>
+    <id>q3b</id>
+    <question>Find the top-10 authors who published the most number of ``Database'' papers. </question>
+    <sql><![CDATA[
+        WITH database_authors AS (
+        SELECT authorship.pubkey, author, area FROM inproceedings, authorship
+        WHERE
+            inproceedings.pubkey = authorship.pubkey
+            AND area = 'Database'
+        )
+
+        SELECT author, COUNT(*) as cnt 
+        FROM database_authors 
+        GROUP BY author
+        ORDER BY cnt DESC
+        LIMIT 10; 
+    ]]></sql>
+    <result>
+        Divesh Srivastava	150
+        H. V. Jagadish	127
+        Surajit Chaudhuri	127
+        Jiawei Han 0001	110
+        Philip S. Yu	110
+        Xuemin Lin 0001	109
+        Jeffrey F. Naughton	108
+        Beng Chin Ooi	105
+        Hector Garcia-Molina	104
+        Michael Stonebraker	100
+    </result>
+</item>
+<item>
+	<id>q3c</id>
+	<question>Find the number of authors who published in exactly two of the four areas (do not consider UNKNOWN). </question>
+	<sql><![CDATA[
+        cnt
+        13573
+	]]></sql>
+    <result>
+        WITH area_authors AS (
+            SELECT authorship.pubkey, author, area FROM inproceedings, authorship
+            WHERE 
+                inproceedings.pubkey = authorship.pubkey
+                AND area != 'UNKNOWN'
+        ),
+        area_counts AS (
+            SELECT author, COUNT(area) AS a_cnt FROM area_authors GROUP BY author
+        )
+
+        SELECT COUNT(*) as cnt FROM area_counts WHERE a_cnt = 2;
+    </result>
+</item>
+<item>
+	<id>q3d</id>
+    <question>Find the number of authors who wrote more journal papers than conference papers (irrespective of research areas).</question>
+	<sql><![CDATA[
+        WITH conf_count AS (
+            SELECT authorship.author, COUNT(*) AS ccnt
+            FROM inproceedings, authorship
+            WHERE inproceedings.pubkey = authorship.pubkey
+            GROUP BY authorship.author
+        ),
+        journal_count AS (
+            SELECT authorship.author, COUNT(*) AS jcnt
+            FROM article, authorship
+            WHERE article.pubkey = authorship.pubkey
+            GROUP BY authorship.author 
+        ),
+        combined AS (
+            SELECT journal_count.author, COALESCE(ccnt, 0) AS ccnt, jcnt
+            FROM journal_count
+            LEFT JOIN conf_count ON journal_count.author = conf_count.author
+        )
+
+        SELECT COUNT(*) 
+        FROM combined
+        WHERE jcnt > ccnt
+	]]></sql>
+    <result>
+        1301165
+    </result>
+</item>
+<item>
+	<id>q3e</id>
+    <question>
+    Among the authors who have published at least one “Database” paper (in any year), find the top-5 authors who published the
+    most number of papers (journal OR conference, in any area) since the year 2000 (including the year 2000).
+    </question>
+	<sql><![CDATA[
+        ???
+	]]></sql>
+	<result>
+        ???
+	</result>
+</item>
+</homework>
