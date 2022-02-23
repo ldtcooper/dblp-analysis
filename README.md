@@ -1,10 +1,22 @@
-# Databases
-Assignments for a Graduate Databases course.
+# DBLP Pipeline
+This is a data pipeline built as an assignment for CS 516: Database Systems at Duke University. It ingests XML data from the [DBLP Computer Science Bibliography](https://dblp.org/) and turns it into a Postgres database for analysis.
 
-## Assignment 1
-All code for 
-### Installation
-Create a conda enviornment and install everything in `a1.txt` into it. Then run `setup_a1.sh` to download the required files.
+## Setup
+The first step of this process is to create a conda enviornment from `a1.txt`. This can be done by running the command:
+```sh
+conda env create -f environment.yml
+```
+ After that, you can run `setup.sh` to download the appropriate data.
 
-### Operation
-This can probably just be run with `python pipeline.py`, however, if running on WSL2 with Postgres running in Windows, you will want to run it with `run_a1.sh`.
+ Note that this project was specifically made to run correctly on WSL2.
+
+## Running the pipeline
+Assuming that you have Postgres installed and set up correctly, the first step is setting up the following tables:
+- article: **pubkey** (text), journal (text), year(int)
+- inproceedings: **pubkey** (text), booktitle (text), year(int)
+- authorship: **pubkey** (string), **author** (string)
+
+After that, you can run `run.sh` to convert the downloaded materials from XML.
+
+## Analysis
+Some basic SQL analysis of the database can be found in `assignment1.ipynb`.
